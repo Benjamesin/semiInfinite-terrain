@@ -1,0 +1,107 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+CGPROGRAM
+#pragma kernel HeightAlgorithm
+
+float x,z,scale;
+RWStructuredBuffer<float3> buff;
+float hh;
+float seed;
+
+float GSP(float seed) {
+	float two = ((seed * 211 + 157) * 101) % 929;
+	float one = ((abs(two * 571) * (two % 10)) % 89)* 0.0112359550561798;
+	return(one);
+}
+
+float rounded(float xx, float zz, int offx, int offz) {
+	float angle = radians( GSP(seed + xx * zz) * 360);
+	float length = ((-.5 + GSP((seed + 13) * (xx + zz))) * 20);
+	xx +=cos(angle) * length;
+	zz += sin(angle) * length;
+	float roundedX = round(xx * .05) + offx;
+	float roundedZ = round(zz * .05) + offz;
+	float roundedHeight = GSP((int)(roundedX * 87) + seed * roundedZ) * 26;
+	return (roundedHeight);
+}
+
+float RefSubLit(float xx, float zz) {
+	float height = 13;
+	float rr = rounded(xx, zz, 0, 0);
+	height += rr;
+	rr = rounded(xx, zz, 1, 0);
+	height += (rr - height) * .333;
+	rr = rounded(xx, zz, -1, 0);
+	height += (rr - height) * .333;
+	rr = rounded(xx, zz, 0, 1);
+	height += (rr - height) * .333;
+	rr = rounded(xx, zz, 0, -1);
+	height += (rr - height) * .333;
+	return (height);
+}
+
+float PotentialMountain(float xx, float zz, float height, float gridsize) {
+	int xxx = trunc(xx/ gridsize) * gridsize;
+	int zzz = trunc(zz/ gridsize) * gridsize;
+	int num = round(GSP(xxx + zzz + seed * 87) * 3)-round(GSP(xxx*13+ zzz + seed * 17));
+	float ratio = gridsize * .3333;
+	float2 pos[3];
+	pos[0] = float2(xxx + ratio + GSP((xxx - zzz + seed) * 13) *(gridsize - ratio*2), zzz + ratio + GSP((xxx -211* zzz + seed) * 23) * (gridsize - ratio * 2));
+	pos[1] = float2(xxx + ratio + GSP((xxx + zzz + seed) * 47) * (gridsize - ratio * 2), zzz + ratio + GSP((xxx - zzz + seed) * 73) * (gridsize - ratio * 2));
+	pos[2] = float2(xxx + ratio + GSP((xxx *6+ zzz + seed) * 67+10) * (gridsize - ratio * 2), zzz + ratio + GSP((xxx +13* zzz + seed) * 59) * (gridsize - ratio * 2));
+
+	float max = (ratio*.666)+ GSP(xxx * 73 - zzz *13 + seed * 17) * 15;
+	float width = ratio - (GSP(xxx * 73 + zzz * 13 + seed * 17) * ratio) * .5;
+
+	for (int tt = 0; tt < 3; tt++) {
+		if (num > tt) {
+			float dist = sqrt(pow(xx - pos[tt].x, 2) + pow(zz - pos[tt].y, 2));// distance(float2(xx, zz), pos[tt]);
+			if (dist < width) {
+				float pot = max * ((width - dist) / width) + height;
+				if (GSP(xxx +12+seed- zzz + seed) > .35) {
+					height += (pot - height) * (pot / max);
+				}
+				else {
+					height += (pot - height) * (.25f + .25 * (pot / max));
+				}
+				if (height > width * 1.2) {
+					height -=height * .25;
+				}
+			}
+		}
+	}
+	return(height);
+}
+
+float HeightDetermination(float xx, float zz) {
+	float height = RefSubLit(xx, zz);
+	//height += RefSubLit(xx + 1, zz);
+	//height += RefSubLit(xx, zz + 1);
+	//height += RefSubLit(xx - 1, zz);
+	//height += RefSubLit(xx, zz - 1);
+	//height *= .2;
+	height = PotentialMountain(xx, zz,height,400);	
+	height = PotentialMountain(xx, zz, height, 1000);
+	height = PotentialMountain(xx, zz, height, 6513);
+	return (height);
+}
+
+
+[numthreads(1,1,1)]
+void HeightAlgorithm(){
+	for (float xx = 0; xx < 16; xx++) {
+		for (float zz = 0; zz < 16; zz++) {
+			float hhh = HeightDetermination(x + xx*scale, z + zz*scale);
+			buff[xx*16+zz] = float3(xx,hhh ,zz);
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
